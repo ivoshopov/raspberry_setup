@@ -1,0 +1,11 @@
+--- /lib/udev/rules.d/64-md-raid-assembly.rules	2017-12-06 23:33:00.458103770 +0200
++++ 64-md-raid-assembly.rules	2017-12-06 23:43:03.666603054 +0200
+@@ -26,7 +26,7 @@
+ LABEL="md_inc"
+ 
+ # Disable incremental assembly to fix Debian bug #784070
+-GOTO="md_inc_end"
++# GOTO="md_inc_end"
+ 
+ # remember you can limit what gets auto/incrementally assembled by
+ # mdadm.conf(5)'s 'AUTO' and selectively whitelist using 'ARRAY'

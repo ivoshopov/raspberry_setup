@@ -1,7 +1,7 @@
 IVOS_PROJECT_DIR=/mnt/exthdd/user/ivoshopov/projects
 
 
-all: samba gmediarender minidlna trash-cli dev_tools fast_sshd openvpn default_usb_audio
+all: samba gmediarender minidlna trash-cli dev_tools openvpn default_usb_audio patch_mdadm
 
 
 define WPA_SUPPLICANT_CONF
@@ -20,10 +20,15 @@ wifi:
 	@rm tmp
 	@touch $@
 
+mdadm: apt_update
+	apt-get install -y mdadm
+	mdadm --detail --scan | tee -a /etc/mdadm/mdadm.conf
+	@touch $@
 
-mount_exthdd:
-	mkdir -p /mnt/exthdd
-	echo "UUID=765ce79e-861a-4ce3-9fe4-d716486376ca  /mnt/exthdd      ext4    defaults,errors=remount-ro 0       2" >> /etc/fstab
+mount_exthdd: mdadm
+	mkdir -p /mnt/raid1
+	ln -s /mnt/raid1 /mnt/exthdd
+	echo "/dev/md0  /mnt/raid1/               ext4    defaults,noatime  0       0" >> /etc/fstab
 	mount -a
 	@touch $@
 
@@ -40,7 +45,7 @@ add_users: mount_exthdd
 	@touch $@
 
 samba: apt_update add_users
-	apt-get install samba
+	apt-get -y install samba
 	echo ""
 	echo "Please enter the password for user ivoshopov in samba"
 	smbpasswd -a ivoshopov
@@ -49,16 +54,16 @@ samba: apt_update add_users
 	@touch $@
 
 gmediarender: apt_update
-	apt-get install gmediarender
+	apt-get -y install gmediarender
 	sed -i "s/#\s*ENABLED=1/ENABLED=1/" /etc/default/gmediarender
 	#It looks that libgstreamer0.10 is not used only libgstreamer1.0 is enough
 	#apt-get install libupnp-dev libgstreamer0.10-dev gstreamer0.10-plugins-base gstreamer0.10-plugins-good gstreamer0.10-plugins-bad gstreamer0.10-plugins-ugly gstreamer0.10-pulseaudio gstreamer0.10-alsa
-	apt-get install gstreamer1.0-alsa gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly gstreamer1.0-tools
+	apt-get -y install gstreamer1.0-alsa gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly gstreamer1.0-tools
 	sed -i "s/INITIAL_VOLUME_DB=-10/INITIAL_VOLUME_DB=0/" /etc/init.d/gmediarender
 	@touch $@
 
 minidlna: apt_update mount_exthdd
-	apt-get install minidlna
+	apt-get -y install minidlna
 	mkdir -p /mnt/exthdd/music
 	mkdir -p /mnt/exthdd/photos
 	chgrp users /mnt/exthdd/music
@@ -75,11 +80,11 @@ default_usb_audio:
 	cp asound.conf /etc/
 
 trash-cli: apt_update
-	apt-get install trash-cli
+	apt-get -y install trash-cli
 	@touch $@
 
 openvpn: apt_update
-	apt-get install openvpn
+	apt-get -y install openvpn
 	@touch $@
 
 ivosbash ivosvim: mount_exthdd
@@ -91,10 +96,16 @@ fs_resize:
 	@touch $@
 
 dev_tools: apt_update
-	apt-get install vim git indent ctags cscope screen
+	apt-get -y install vim git indent ctags cscope screen
 	@touch $@
 
 fast_sshd:
 	echo "UseDNS no" >> /etc/ssh/sshd_config
 	@touch $@
 
+patch_mdadm: mdadm
+	patch /lib/udev/rules.d/64-md-raid-assembly.rules 64-md-raid-assembly.rules.patch
+	@touch $@
+
+create_raid: mdadm
+	mdadm --create --verbose /dev/md0 --level=mirror --raid-devices=2 /dev/disk/by-id/usb-ATA_ST2000LM015-2E81_0123456789ABCDE-0:0-part1 /dev/disk/by-id/ata-Hitachi_HTS545050B9SA00_110201PBN475M7EYXELE-part1
